@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaskType {
+  text_classification
+  text_span
+  image_tagging
+}
+
+model Project {
+  id          String       @id @default(cuid())
+  name        String
+  taskType    TaskType
+  labelsJson  String       @db.Text // JSON array of label options
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  items       Item[]
+  annotations Annotation[]
+
+  @@map("projects")
+}
+
+model Item {
+  id            String       @id @default(cuid())
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inputText     String?      @db.Text
+  inputMetaJson String?      @db.Text // JSON metadata (e.g., image URL, etc.)
+  createdAt     DateTime     @default(now())
+  annotations   Annotation[]
+
+  @@index([projectId])
+  @@map("items")
+}
+
+model Annotator {
+  id             String       @id @default(cuid())
+  name           String?
+  externalUserId String?      @unique
+  createdAt      DateTime     @default(now())
+  annotations    Annotation[]
+
+  @@map("annotators")
+}
+
+model Annotation {
+  id          String     @id @default(cuid())
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  annotatorId String?
+  annotator   Annotator? @relation(fields: [annotatorId], references: [id], onDelete: SetNull)
+  dataJson    String     @db.Text // JSON annotation data
+  createdAt   DateTime   @default(now())
+
+  @@index([projectId])
+  @@index([itemId])
+  @@index([annotatorId])
+  @@map("annotations")
+}
