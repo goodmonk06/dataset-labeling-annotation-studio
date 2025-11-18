@@ -1,425 +1,512 @@
 # Dataset Labeling Annotation Studio
 
-A web-based annotation tool for creating labeled datasets for machine learning and LLM fine-tuning. Built with Next.js, TypeScript, Prisma, and PostgreSQL.
+A production-ready web-based annotation tool for creating labeled datasets for machine learning and LLM fine-tuning. Features a complete vertical slice implementation with full CRUD operations, validation, error handling, and Docker deployment support.
 
-## Features
+## Overview
 
-- **Multiple Task Types**
-  - Text Classification (single or multi-label)
-  - Text Span Labeling (NER, entity extraction)
-  - Image Tagging (planned)
+This annotation studio provides a **complete end-to-end workflow** for dataset labeling:
+1. **Create projects** with customizable labels and task types
+2. **Import data** via JSONL for bulk upload
+3. **Annotate items** with keyboard shortcuts for efficiency
+4. **Export annotations** in LLM-ready formats
+5. **Track progress** with real-time statistics
 
-- **Efficient Annotation UI**
-  - Keyboard shortcuts for rapid annotation
-  - Progress tracking
-  - Real-time statistics
-
-- **Data Management**
-  - JSONL import for bulk item upload
-  - JSONL export for annotations
-  - Compatible with LLM fine-tuning formats
+**Implemented Vertical Slice:**
+- ✅ Project Management: Full CRUD (Create, Read, Update, Delete)
+- ✅ Item Management: Bulk import and individual item handling
+- ✅ Annotation Workflow: Text classification and span labeling
+- ✅ Statistics Dashboard: Label distribution and progress tracking
+- ✅ Data Export: JSONL format optimized for fine-tuning
+- ✅ API Layer: Fully validated REST endpoints with error handling
+- ✅ UI Layer: Interactive frontend with keyboard navigation
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 with App Router, TypeScript, Tailwind CSS
-- **Backend**: Next.js API Routes
-- **Database**: Prisma ORM + PostgreSQL
-- **Storage**: Local filesystem (abstracted for future cloud storage)
+**Frontend:**
+- Next.js 15 (App Router)
+- TypeScript
+- Tailwind CSS
+- React 19
+
+**Backend:**
+- Next.js API Routes
+- Zod validation
+- Centralized error handling
+
+**Database:**
+- PostgreSQL 16
+- Prisma ORM
+- Type-safe queries
+
+**DevOps:**
+- Docker & Docker Compose
+- Vitest for testing
+- Database seeding for demos
+
+## Domain Model
+
+### Core Entities
+
+```
+┌─────────────┐       ┌──────────┐       ┌──────────────┐
+│   Project   │──────<│   Item   │──────<│  Annotation  │
+└─────────────┘       └──────────┘       └──────────────┘
+      │                                          │
+      │                                          ▼
+      │                                   ┌──────────────┐
+      │                                   │  Annotator   │
+      └───────────────────────────────────└──────────────┘
+```
+
+**Project**: Container for annotation work
+- `id`, `name`, `taskType`, `labelsJson`
+- Task types: `text_classification`, `text_span`, `image_tagging`
+
+**Item**: Data to be annotated
+- `id`, `projectId`, `inputText`, `inputMetaJson`
+- Supports metadata for tracking sources, categories, etc.
+
+**Annotation**: Labeled data
+- `id`, `projectId`, `itemId`, `annotatorId`, `dataJson`
+- Flexible JSON format adapts to task type
+
+**Annotator**: User who creates annotations
+- `id`, `name`, `externalUserId`
+- Optional for anonymous annotation
 
 ## Getting Started
 
-### Prerequisites
+### Requirements
 
-- Node.js 18+
-- PostgreSQL database
+- **Node.js** 18+
+- **PostgreSQL** 16+ (or use Docker Compose)
+- **npm** or **pnpm**
 
-### Installation
+### Setup Steps
 
-1. Clone the repository:
+#### Option 1: Docker Compose (Recommended)
+
+The fastest way to get started:
+
 ```bash
+# 1. Clone the repository
 git clone <repository-url>
 cd dataset-labeling-annotation-studio
-```
 
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Set up environment variables:
-```bash
+# 2. Copy environment file
 cp .env.example .env
+
+# 3. Start all services (PostgreSQL + App)
+docker compose up
+
+# The app will be available at http://localhost:3000
+# Database is automatically migrated and seeded with demo data
 ```
 
-Edit `.env` and configure your database URL:
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/annotation_studio?schema=public"
-```
+#### Option 2: Local Development
 
-4. Run database migrations:
+For active development with hot reload:
+
 ```bash
-npx prisma migrate dev --name init
-```
+# 1. Install dependencies
+npm install
 
-5. Start the development server:
-```bash
+# 2. Configure database
+cp .env.example .env
+# Edit .env and set your DATABASE_URL
+
+# 3. Run database migrations
+npm run db:migrate
+
+# 4. Seed demo data
+npm run db:seed
+
+# 5. Start development server
 npm run dev
+
+# Open http://localhost:3000
 ```
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+### Available Scripts
 
-## Usage Guide
+```bash
+# Development
+npm run dev          # Start dev server with hot reload
 
-### 1. Create a Project
+# Building
+npm run build        # Production build
+npm start            # Run production build
 
-1. Navigate to the Projects page (home)
-2. Click "New Project"
-3. Fill in:
-   - **Project Name**: e.g., "Sentiment Analysis"
-   - **Task Type**: Choose from text_classification, text_span, or image_tagging
-   - **Labels**: Comma-separated labels (e.g., "positive, negative, neutral")
+# Database
+npm run db:generate  # Generate Prisma client
+npm run db:migrate   # Run migrations
+npm run db:push      # Push schema without migration
+npm run db:seed      # Seed demo data
+npm run db:studio    # Open Prisma Studio (DB GUI)
+npm run db:reset     # Reset and reseed database
 
-### 2. Import Data
+# Testing
+npm test             # Run tests
+npm run test:ui      # Run tests with UI
+npm run test:coverage # Run with coverage
 
-#### JSONL Format
-
-Each line should be a valid JSON object:
-
-```jsonl
-{"inputText": "This product is amazing!", "inputMeta": {"source": "review"}}
-{"inputText": "Terrible customer service.", "inputMeta": {"source": "review"}}
-{"text": "It's okay, nothing special."}
+# Code Quality
+npm run lint         # Lint code
 ```
 
-**Field Options:**
-- `inputText` or `text`: The text content to annotate (required)
-- `inputMeta` or `meta`: Optional metadata (object)
+## Example Flow: Sentiment Analysis Project
 
-#### Import Steps
+This walkthrough demonstrates the complete vertical slice using the seeded demo data.
 
-1. From the Projects page, click "Import" on your project
-2. Paste JSONL data or load the example
-3. Click "Import Items"
+### 1. View Projects
 
-### 3. Annotate
+Navigate to `http://localhost:3000/projects`
 
-1. Click "Annotate" on your project
-2. Use the annotation interface:
+You'll see two demo projects:
+- **Customer Review Sentiment Analysis** (text_classification)
+- **Named Entity Recognition - News Articles** (text_span)
 
-#### Text Classification
-- Click labels or use number keys (1-9) to select
-- Press Enter or 's' to submit
-- Use arrow keys or 'n'/'p' to navigate
+### 2. Annotate Items
 
-#### Text Span Labeling
-- Select text with your mouse
-- Choose a label from the dropdown
-- Click "Add Span"
-- Repeat for all entities
-- Click "Submit All Spans"
+Click "Annotate" on the Sentiment Analysis project:
 
-#### Keyboard Shortcuts
+```
+URL: /projects/{id}/annotate
+
+Workflow:
+1. Read the review text
+2. Select label(s): positive, negative, or neutral
+   - Click labels OR use number keys (1, 2, 3)
+3. Press Enter or 's' to submit
+4. Navigate with arrow keys or 'n'/'p'
+5. System auto-advances to next item
+```
+
+**Keyboard Shortcuts:**
+- `1-9`: Toggle labels
+- `Enter` or `s`: Submit annotation
 - `n` or `→`: Next item
 - `p` or `←`: Previous item
-- `1-9`: Toggle labels (text classification)
-- `Enter` or `s`: Submit annotation
 
-### 4. View Statistics
+### 3. View Statistics
 
-1. Click "Stats" on your project
-2. View:
-   - Total items and annotations
-   - Annotated items count
-   - Coverage percentage
-   - Label distribution
-   - Recent annotations
+Click "Stats" to see:
+- Total items: 10
+- Annotated items: 5 (from seed data)
+- Label distribution chart
+- Recent annotations
+- Export button
 
-### 5. Export Annotations
+### 4. Export Data
 
-From the Stats page, click "Export Annotations (JSONL)" to download your annotated dataset.
-
-#### Export Format
-
-The exported JSONL is optimized for LLM fine-tuning:
+Click "Export Annotations (JSONL)":
 
 ```jsonl
 {
-  "input": "This product is amazing!",
+  "input": "This product exceeded my expectations! Absolutely love it.",
   "annotation": {"labels": ["positive"]},
   "metadata": {
     "projectId": "...",
-    "projectName": "Sentiment Analysis",
+    "projectName": "Customer Review Sentiment Analysis",
     "taskType": "text_classification",
     "itemId": "...",
     "annotationId": "...",
     "annotatedAt": "2024-01-15T10:30:00.000Z",
-    "inputMeta": {"source": "review"}
+    "inputMeta": {"source": "review", "category": "electronics"}
   }
 }
 ```
+
+### 5. Import New Items
+
+Click "Import" on any project:
+
+```jsonl
+{"inputText": "Great product!", "inputMeta": {"source": "twitter"}}
+{"inputText": "Not worth the price.", "inputMeta": {"source": "reddit"}}
+```
+
+Paste the JSONL and click "Import Items" - they appear immediately in the annotation interface.
+
+## API Endpoints
+
+All endpoints use **Zod validation** and **centralized error handling**.
+
+### Projects
+
+```typescript
+GET    /api/projects              // List all projects
+POST   /api/projects              // Create project
+GET    /api/projects/[id]         // Get project details
+PATCH  /api/projects/[id]         // Update project
+DELETE /api/projects/[id]         // Delete project
+```
+
+**Create Project Example:**
+```bash
+curl -X POST http://localhost:3000/api/projects \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Email Classification",
+    "taskType": "text_classification",
+    "labels": ["spam", "not_spam"]
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "clx...",
+    "name": "Email Classification",
+    "taskType": "text_classification",
+    "labelsJson": "[\"spam\",\"not_spam\"]",
+    "createdAt": "2024-01-15T10:00:00.000Z"
+  }
+}
+```
+
+### Items
+
+```typescript
+GET  /api/projects/[id]/items            // List items
+POST /api/projects/[id]/items            // Create item
+POST /api/projects/[id]/items/import     // Bulk import
+```
+
+### Annotations
+
+```typescript
+GET  /api/projects/[id]/annotations        // List annotations
+POST /api/projects/[id]/annotations        // Create annotation
+GET  /api/projects/[id]/annotations/export // Export as JSONL
+```
+
+### Error Responses
+
+All errors follow a consistent format:
+
+```json
+{
+  "error": "Validation failed",
+  "code": "VALIDATION_ERROR",
+  "details": [
+    {
+      "path": "name",
+      "message": "Project name is required"
+    }
+  ]
+}
+```
+
+Error codes:
+- `VALIDATION_ERROR` (400)
+- `NOT_FOUND` (404)
+- `CONFLICT` (409)
+- `INTERNAL_ERROR` (500)
 
 ## Using with LLM Fine-Tuning
 
-### OpenAI Fine-Tuning
+### OpenAI Format
 
-Convert exported annotations to OpenAI's format:
+Convert exported annotations:
 
 ```javascript
-// convert.js
-const fs = require('fs');
-const readline = require('readline');
+// scripts/convert-to-openai.js
+const fs = require('fs')
+const readline = require('readline')
 
-async function convertToOpenAI(inputFile, outputFile) {
-  const fileStream = fs.createReadStream(inputFile);
+async function convert(inputFile, outputFile) {
   const rl = readline.createInterface({
-    input: fileStream,
-    crlfDelay: Infinity
-  });
+    input: fs.createReadStream(inputFile)
+  })
 
-  const output = [];
-
+  const output = []
   for await (const line of rl) {
-    const item = JSON.parse(line);
-
-    // For text classification
-    const systemPrompt = "You are a sentiment analysis classifier. Classify the following text as positive, negative, or neutral.";
-    const userMessage = item.input;
-    const assistantMessage = item.annotation.labels.join(', ');
-
+    const item = JSON.parse(line)
     output.push({
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-        { role: "assistant", content: assistantMessage }
+        { role: "system", content: "Classify the sentiment." },
+        { role: "user", content: item.input },
+        { role: "assistant", content: item.annotation.labels[0] }
       ]
-    });
+    })
   }
 
-  fs.writeFileSync(outputFile, output.map(o => JSON.stringify(o)).join('\n'));
-  console.log(`Converted ${output.length} examples to ${outputFile}`);
+  fs.writeFileSync(outputFile, output.map(o => JSON.stringify(o)).join('\n'))
 }
 
-convertToOpenAI('annotations-export.jsonl', 'openai-format.jsonl');
+convert('annotations-export.jsonl', 'openai-format.jsonl')
 ```
 
-Run the conversion:
-```bash
-node convert.js
-```
-
-Then fine-tune with OpenAI:
+Then fine-tune:
 ```bash
 openai api fine_tuning.jobs.create \
   -t openai-format.jsonl \
   -m gpt-4o-mini
 ```
 
-### Custom Fine-Tuning Pipeline
-
-For other frameworks (Hugging Face, LangChain, etc.):
+### Hugging Face / spaCy
 
 ```python
-# load_annotations.py
+# scripts/load_annotations.py
 import json
-
-def load_annotations(file_path):
-    """Load annotations from exported JSONL"""
-    annotations = []
-    with open(file_path, 'r') as f:
-        for line in f:
-            item = json.loads(line)
-            annotations.append({
-                'text': item['input'],
-                'label': item['annotation']['labels'][0] if item['annotation']['labels'] else None,
-                'metadata': item['metadata']
-            })
-    return annotations
-
-# Usage
-data = load_annotations('annotations-export.jsonl')
-print(f"Loaded {len(data)} annotated examples")
-
-# Split into train/val/test
 from sklearn.model_selection import train_test_split
-train, test = train_test_split(data, test_size=0.2, random_state=42)
-train, val = train_test_split(train, test_size=0.1, random_state=42)
 
-print(f"Train: {len(train)}, Val: {len(val)}, Test: {len(test)}")
-```
-
-### For Text Span Labeling (NER)
-
-Convert to spaCy or Hugging Face NER format:
-
-```python
-# convert_spans.py
-import json
-
-def convert_to_ner_format(file_path):
-    """Convert text span annotations to NER training format"""
-    ner_data = []
-
-    with open(file_path, 'r') as f:
+def load_annotations(path):
+    data = []
+    with open(path) as f:
         for line in f:
             item = json.loads(line)
-            text = item['input']
-            entities = []
+            data.append({
+                'text': item['input'],
+                'label': item['annotation']['labels'][0],
+                'meta': item['metadata']
+            })
+    return data
 
-            for span in item['annotation'].get('spans', []):
-                entities.append((
-                    span['start'],
-                    span['end'],
-                    span['label']
-                ))
-
-            ner_data.append((text, {'entities': entities}))
-
-    return ner_data
-
-# Usage with spaCy
-import spacy
-from spacy.training import Example
-
-nlp = spacy.blank("en")
-ner = nlp.add_pipe("ner")
-
-data = convert_to_ner_format('annotations-export.jsonl')
-
-# Add labels
-for text, annotations in data:
-    for _, _, label in annotations['entities']:
-        ner.add_label(label)
-
-# Train
-nlp.begin_training()
-for text, annotations in data:
-    doc = nlp.make_doc(text)
-    example = Example.from_dict(doc, annotations)
-    nlp.update([example])
+# Load and split
+data = load_annotations('annotations-export.jsonl')
+train, test = train_test_split(data, test_size=0.2)
+print(f"Train: {len(train)}, Test: {len(test)}")
 ```
-
-## Database Schema
-
-### Project
-- `id`: Unique identifier
-- `name`: Project name
-- `taskType`: text_classification | text_span | image_tagging
-- `labelsJson`: JSON array of available labels
-
-### Item
-- `id`: Unique identifier
-- `projectId`: Reference to project
-- `inputText`: Text content to annotate
-- `inputMetaJson`: Optional metadata (JSON)
-
-### Annotation
-- `id`: Unique identifier
-- `projectId`: Reference to project
-- `itemId`: Reference to item
-- `annotatorId`: Optional reference to annotator
-- `dataJson`: Annotation data (format varies by task type)
-
-### Annotator
-- `id`: Unique identifier
-- `name`: Annotator name (optional)
-- `externalUserId`: External user ID for integration (optional)
-
-## API Endpoints
-
-### Projects
-- `GET /api/projects` - List all projects
-- `POST /api/projects` - Create project
-- `GET /api/projects/[id]` - Get project details
-- `PATCH /api/projects/[id]` - Update project
-- `DELETE /api/projects/[id]` - Delete project
-
-### Items
-- `GET /api/projects/[id]/items` - List items
-- `POST /api/projects/[id]/items` - Create item
-- `POST /api/projects/[id]/items/import` - Bulk import items
-
-### Annotations
-- `GET /api/projects/[id]/annotations` - List annotations
-- `POST /api/projects/[id]/annotations` - Create annotation
-- `GET /api/projects/[id]/annotations/export` - Export as JSONL
 
 ## Development
 
-### Database Migrations
-
-After modifying `prisma/schema.prisma`:
+### Running Tests
 
 ```bash
-npx prisma migrate dev --name describe_your_changes
+# Run all tests
+npm test
+
+# Run with UI
+npm run test:ui
+
+# Run with coverage
+npm run test:coverage
 ```
 
-### Reset Database
+Tests cover:
+- ✅ Validation schemas (Zod)
+- ✅ Error handling
+- ✅ API utilities
+- 📝 Integration tests (planned)
+
+### Database Management
 
 ```bash
-npx prisma migrate reset
+# View data in GUI
+npm run db:studio
+
+# Create new migration
+npm run db:migrate
+
+# Reset everything
+npm run db:reset
 ```
 
-### Prisma Studio
+### Project Structure
 
-Explore your database with a GUI:
-
-```bash
-npx prisma studio
+```
+.
+├── app/
+│   ├── api/                 # API routes
+│   │   └── projects/
+│   │       ├── route.ts     # List & create projects
+│   │       └── [id]/
+│   │           ├── route.ts # Get, update, delete project
+│   │           ├── items/
+│   │           └── annotations/
+│   ├── projects/            # UI pages
+│   │   ├── page.tsx         # Project list
+│   │   └── [id]/
+│   │       ├── annotate/    # Main annotation UI
+│   │       ├── stats/       # Statistics dashboard
+│   │       └── import/      # JSONL import
+│   └── layout.tsx
+├── lib/
+│   ├── prisma.ts            # Prisma client
+│   ├── validations.ts       # Zod schemas
+│   ├── errors.ts            # Error handling
+│   └── __tests__/           # Unit tests
+├── prisma/
+│   ├── schema.prisma        # Database schema
+│   └── seed.ts              # Seed data
+├── Dockerfile
+├── docker-compose.yml
+└── vitest.config.ts
 ```
 
 ## Deployment
 
-### Vercel (Recommended)
+### Docker Production
 
-1. Push your code to GitHub
-2. Import project in Vercel
-3. Add environment variables:
-   - `DATABASE_URL`: Your PostgreSQL connection string
+```bash
+# Build image
+docker build -t annotation-studio .
+
+# Run with external PostgreSQL
+docker run -p 3000:3000 \
+  -e DATABASE_URL="postgresql://..." \
+  annotation-studio
+```
+
+### Vercel
+
+1. Push to GitHub
+2. Import in Vercel
+3. Add environment variable: `DATABASE_URL`
 4. Deploy
 
-### Docker
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-
-COPY . .
-RUN npx prisma generate
-RUN npm run build
-
-EXPOSE 3000
-CMD ["npm", "start"]
-```
-
-Build and run:
+**Note:** Run migrations manually on your database before deploying:
 ```bash
-docker build -t annotation-studio .
-docker run -p 3000:3000 -e DATABASE_URL="..." annotation-studio
+DATABASE_URL="your-production-db-url" npx prisma migrate deploy
 ```
+
+## Future Extensions
+
+**Phase 3 Priorities:**
+- [ ] **Multi-user support** with role-based access control
+- [ ] **Inter-annotator agreement** metrics (Cohen's Kappa, Fleiss' Kappa)
+- [ ] **Annotation history** and conflict resolution
+- [ ] **Image tagging** task type implementation
+- [ ] **Active learning** integration for smart item selection
+- [ ] **Batch operations** for bulk annotation updates
+- [ ] **Webhook notifications** for annotation events
+- [ ] **Export formats** for more ML frameworks
+
+**Infrastructure:**
+- [ ] Cloud storage integration (S3, GCS) for large files
+- [ ] Redis caching for API responses
+- [ ] Rate limiting and API authentication
+- [ ] Audit logs for all operations
+- [ ] Backup and restore utilities
+
+**UX Improvements:**
+- [ ] Annotation guidelines editor
+- [ ] Custom keyboard shortcut configuration
+- [ ] Annotation templates and presets
+- [ ] Dark mode support
+- [ ] Mobile-responsive annotation interface
 
 ## Contributing
 
-Contributions are welcome! Please:
+We welcome contributions! Please:
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Roadmap
+### Development Guidelines
 
-- [ ] Image tagging support
-- [ ] Multi-user annotation with conflict resolution
-- [ ] Inter-annotator agreement metrics
-- [ ] Cloud storage integration (S3, GCS)
-- [ ] Active learning integration
-- [ ] Annotation guidelines editor
-- [ ] API authentication
-- [ ] Webhooks for annotation events
+- Write tests for new features
+- Follow TypeScript best practices
+- Use Zod for validation
+- Keep API responses consistent
+- Update documentation
 
 ## License
 
@@ -427,11 +514,16 @@ MIT
 
 ## Support
 
-For issues and questions:
-- Create an issue on GitHub
-- Check existing documentation
-- Review the code examples above
+**Issues:** [GitHub Issues](https://github.com/your-org/dataset-labeling-annotation-studio/issues)
+
+**Documentation:** This README and inline code comments
 
 ---
 
-Built with ❤️ for the ML community
+**Demo Credentials** (after seeding):
+- Annotator 1: `alice@example.com` (Alice Johnson)
+- Annotator 2: `bob@example.com` (Bob Smith)
+
+**Quick Start:** `docker compose up` → Open `http://localhost:3000`
+
+Built for the ML community with ❤️

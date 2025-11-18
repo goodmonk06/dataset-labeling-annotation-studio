@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { CreateProjectSchema } from '@/lib/validations'
+import { handleError, createSuccessResponse } from '@/lib/errors'
 
 // GET /api/projects - List all projects
 export async function GET() {
@@ -14,8 +16,7 @@ export async function GET() {
     })
     return NextResponse.json(projects)
   } catch (error) {
-    console.error('Error fetching projects:', error)
-    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 })
+    return handleError(error)
   }
 }
 
@@ -23,26 +24,18 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, taskType, labels } = body
-
-    if (!name || !taskType) {
-      return NextResponse.json(
-        { error: 'Name and taskType are required' },
-        { status: 400 }
-      )
-    }
+    const validatedData = CreateProjectSchema.parse(body)
 
     const project = await prisma.project.create({
       data: {
-        name,
-        taskType,
-        labelsJson: JSON.stringify(labels || [])
+        name: validatedData.name,
+        taskType: validatedData.taskType,
+        labelsJson: JSON.stringify(validatedData.labels)
       }
     })
 
-    return NextResponse.json(project, { status: 201 })
+    return createSuccessResponse(project, 201)
   } catch (error) {
-    console.error('Error creating project:', error)
-    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
+    return handleError(error)
   }
 }
