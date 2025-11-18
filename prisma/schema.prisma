@@ -19,55 +19,221 @@ enum TaskType {
   image_tagging
 }
 
+enum ProjectStatus {
+  draft
+  active
+  paused
+  completed
+  archived
+}
+
+enum ItemStatus {
+  pending
+  assigned
+  in_progress
+  annotated
+  reviewing
+  approved
+  rejected
+}
+
+enum ItemPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum ReviewStatus {
+  pending
+  approved
+  rejected
+  needs_revision
+}
+
+enum AnnotatorRole {
+  annotator
+  reviewer
+  admin
+}
+
 model Project {
-  id          String       @id @default(cuid())
-  name        String
-  taskType    TaskType
-  labelsJson  String       @db.Text // JSON array of label options
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  items       Item[]
-  annotations Annotation[]
+  id                   String              @id @default(cuid())
+  name                 String
+  description          String?             @db.Text
+  taskType             TaskType
+  labelsJson           String              @db.Text // JSON array of label options
+  status               ProjectStatus       @default(active)
+  qualityThreshold     Float?              @default(0.8) // Minimum agreement score
+  guidelinesUrl        String?
+  metadataJson         String?             @db.Text // Custom project settings
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  items                Item[]
+  annotations          Annotation[]
+  guidelines           LabelGuideline[]
+  batches              AnnotationBatch[]
+  tasks                AnnotationTask[]
+  reviews              AnnotationReview[]
 
   @@map("projects")
 }
 
 model Item {
-  id            String       @id @default(cuid())
+  id            String              @id @default(cuid())
   projectId     String
-  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  inputText     String?      @db.Text
-  inputMetaJson String?      @db.Text // JSON metadata (e.g., image URL, etc.)
-  createdAt     DateTime     @default(now())
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  batchId       String?
+  batch         AnnotationBatch?    @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  inputText     String?             @db.Text
+  inputMetaJson String?             @db.Text // JSON metadata
+  status        ItemStatus          @default(pending)
+  priority      ItemPriority        @default(medium)
+  difficulty    Int?                // 1-5 difficulty rating
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
   annotations   Annotation[]
+  tasks         AnnotationTask[]
 
   @@index([projectId])
+  @@index([batchId])
+  @@index([status])
+  @@index([priority])
   @@map("items")
 }
 
 model Annotator {
-  id             String       @id @default(cuid())
-  name           String?
-  externalUserId String?      @unique
-  createdAt      DateTime     @default(now())
-  annotations    Annotation[]
+  id               String             @id @default(cuid())
+  name             String?
+  email            String?            @unique
+  externalUserId   String?            @unique
+  role             AnnotatorRole      @default(annotator)
+  skillLevel       Int                @default(1) // 1-5 skill level
+  preferencesJson  String?            @db.Text // UI preferences, notification settings
+  statsJson        String?            @db.Text // Performance metrics
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  annotations      Annotation[]
+  tasks            AnnotationTask[]
+  reviews          AnnotationReview[]
 
   @@map("annotators")
 }
 
 model Annotation {
-  id          String     @id @default(cuid())
-  projectId   String
-  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  itemId      String
-  item        Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  annotatorId String?
-  annotator   Annotator? @relation(fields: [annotatorId], references: [id], onDelete: SetNull)
-  dataJson    String     @db.Text // JSON annotation data
-  createdAt   DateTime   @default(now())
+  id             String             @id @default(cuid())
+  projectId      String
+  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  itemId         String
+  item           Item               @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  annotatorId    String?
+  annotator      Annotator?         @relation(fields: [annotatorId], references: [id], onDelete: SetNull)
+  taskId         String?
+  task           AnnotationTask?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  dataJson       String             @db.Text // JSON annotation data
+  confidence     Float?             // 0-1 confidence score
+  timeSpentMs    Int?               // Time spent in milliseconds
+  metadataJson   String?            @db.Text // Additional metadata
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  reviews        AnnotationReview[]
 
   @@index([projectId])
   @@index([itemId])
   @@index([annotatorId])
+  @@index([taskId])
   @@map("annotations")
+}
+
+model AnnotationTask {
+  id            String       @id @default(cuid())
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  itemId        String
+  item          Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  annotatorId   String
+  annotator     Annotator    @relation(fields: [annotatorId], references: [id], onDelete: Cascade)
+  status        ItemStatus   @default(assigned)
+  dueDate       DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  annotations   Annotation[]
+
+  @@unique([itemId, annotatorId]) // One task per item per annotator
+  @@index([projectId])
+  @@index([annotatorId])
+  @@index([status])
+  @@map("annotation_tasks")
+}
+
+model AnnotationReview {
+  id           String        @id @default(cuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  annotationId String
+  annotation   Annotation    @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+  reviewerId   String
+  reviewer     Annotator     @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  status       ReviewStatus  @default(pending)
+  feedback     String?       @db.Text
+  correctedDataJson String?  @db.Text // Corrected annotation if rejected
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([projectId])
+  @@index([annotationId])
+  @@index([reviewerId])
+  @@index([status])
+  @@map("annotation_reviews")
+}
+
+model LabelGuideline {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label       String   // The label this guideline is for
+  title       String
+  description String   @db.Text
+  examples    String?  @db.Text // JSON array of examples
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, label])
+  @@index([projectId])
+  @@map("label_guidelines")
+}
+
+model AnnotationBatch {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  status      String   @default("active") // active, completed, archived
+  metadataJson String? @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       Item[]
+
+  @@index([projectId])
+  @@map("annotation_batches")
+}
+
+model Template {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?  @db.Text
+  taskType      TaskType
+  labelsJson    String   @db.Text
+  guidelinesJson String? @db.Text // Starter guidelines
+  configJson    String?  @db.Text // Default configuration
+  isPublic      Boolean  @default(false)
+  usageCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("templates")
 }
